@@ -22,6 +22,7 @@ import DiagnosticsView from './views/Admin/DiagnosticsView';
 import JournalistsView from './views/Admin/JournalistsView';
 import RssFeedsView from './views/Admin/RssFeedsView';
 import PagesListView from './views/Admin/PagesListView';
+import SeoView from './views/Admin/SeoView';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -54,6 +55,7 @@ const App: React.FC = () => {
         <Route path="/admin/diagnostics" element={<DiagnosticsView />} />
         <Route path="/admin/journalists" element={<JournalistsView />} />
         <Route path="/admin/rss" element={<RssFeedsView />} />
+        <Route path="/admin/seo" element={<SeoView />} />
         
         <Route path="/admin/pages" element={<PagesListView />} />
         <Route path="/admin/categories" element={<GenericListView title="Categories" table="categories" />} />

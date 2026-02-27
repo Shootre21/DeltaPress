@@ -47,14 +47,18 @@ const AnalyticsView: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('users');
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
   
   const [stats, setStats] = useState({
     totalViews: 0,
     sitePerformance: {
       totalViews: 0,
       totalClicks: 0,
+      totalVisitors: 0,
+      trafficCounter: 0,
       avgSessionTime: 0,
-      longestSession: 0
+      longestSession: 0,
+      topClickedLinks: [] as { link: string, clicks: number }[]
     },
     userMetrics: {
       totalUsers: 0,
@@ -87,6 +91,7 @@ const AnalyticsView: React.FC = () => {
       const userActivityMap: Record<string, Set<string>> = {}; 
       const userPageInterestMap: Record<string, Record<string, number>> = {}; 
       const postViewsMap: Record<string, number> = {};
+      const clickedLinksMap: Record<string, number> = {};
       const sessionMap: Record<string, { start: number, end: number, events: number }> = {};
 
       rawEvents.forEach(e => {
@@ -103,6 +108,12 @@ const AnalyticsView: React.FC = () => {
         // Global post views
         if (e.event_type === 'view' && e.target_id) {
           postViewsMap[e.target_id] = (postViewsMap[e.target_id] || 0) + 1;
+        }
+
+        // Global link click tracking
+        if (e.event_type === 'click') {
+          const clickLink = e.target_id || e.metadata?.url || e.metadata?.referrer || 'unknown-link';
+          clickedLinksMap[clickLink] = (clickedLinksMap[clickLink] || 0) + 1;
         }
 
         // User specific metrics
@@ -123,6 +134,10 @@ const AnalyticsView: React.FC = () => {
       const totalSessionTime = sessionDurations.reduce((a, b) => a + b, 0);
       const avgSessionTime = sessionList.length > 0 ? Math.round(totalSessionTime / sessionList.length) : 0;
       const longestSession = sessionList.length > 0 ? Math.round(Math.max(...sessionDurations)) : 0;
+      const topClickedLinks = Object.entries(clickedLinksMap)
+        .map(([link, clicks]) => ({ link, clicks }))
+        .sort((a, b) => b.clicks - a.clicks)
+        .slice(0, 10);
 
       // Process Bot Stats
       const botPostCounts: Record<string, number> = {};
@@ -157,8 +172,11 @@ const AnalyticsView: React.FC = () => {
         sitePerformance: {
           totalViews: rawEvents.filter(e => e.event_type === 'view').length,
           totalClicks: rawEvents.filter(e => e.event_type === 'click').length,
+          totalVisitors: Object.keys(sessionMap).length,
+          trafficCounter: rawEvents.length,
           avgSessionTime,
-          longestSession
+          longestSession,
+          topClickedLinks
         },
         userMetrics: {
           totalUsers: profilesList.length,
@@ -179,12 +197,17 @@ const AnalyticsView: React.FC = () => {
           topPosts: Object.entries(postViewsMap).map(([slug, views]) => ({ slug, views })).sort((a,b) => b.views - a.views).slice(0, 10)
         }
       });
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Fetch stats error:", err);
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    const refreshInterval = setInterval(fetchData, 30000);
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   const TabButton = ({ id, label }: { id: AnalyticsTab, label: string }) => (
     <button
@@ -204,7 +227,7 @@ const AnalyticsView: React.FC = () => {
         <header className="mb-10 flex justify-between items-end">
           <div>
             <h1 className="text-4xl font-black text-gray-900 font-serif leading-none">Intelligence Hub</h1>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Centralized Site Data Engine</p>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Centralized Site Data Engine {lastUpdated ? `• Live Sync ${lastUpdated}` : ''}</p>
           </div>
           <button 
             onClick={fetchData} 
@@ -283,10 +306,13 @@ const AnalyticsView: React.FC = () => {
             )}
 
             {activeTab === 'site' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                  {[
                    { label: 'Total Page Views', val: stats.sitePerformance.totalViews, icon: '📈' },
                    { label: 'Site Interactions', val: stats.sitePerformance.totalClicks, icon: '🖱️' },
+                   { label: 'Total Visitors', val: stats.sitePerformance.totalVisitors, icon: '👥' },
+                   { label: 'Traffic Counter', val: stats.sitePerformance.trafficCounter, icon: '🚦' },
                    { label: 'Avg Session Stay', val: `${stats.sitePerformance.avgSessionTime}m`, icon: '⏳' },
                    { label: 'Longest Session', val: `${stats.sitePerformance.longestSession}m`, icon: '🏆' }
                  ].map((c, i) => (
@@ -296,6 +322,24 @@ const AnalyticsView: React.FC = () => {
                        <div className="text-3xl font-black text-gray-900">{c.val}</div>
                     </div>
                  ))}
+                </div>
+
+                <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                  <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-6">Most Clicked Links</h3>
+                  <div className="space-y-4">
+                    {stats.sitePerformance.topClickedLinks.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between gap-4 border-b border-gray-50 pb-3 last:border-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-800 truncate">{item.link}</p>
+                        </div>
+                        <span className="text-xs font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-full shrink-0">{item.clicks} Clicks</span>
+                      </div>
+                    ))}
+                    {stats.sitePerformance.topClickedLinks.length === 0 && (
+                      <p className="text-xs text-gray-400 italic">No click links recorded yet.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

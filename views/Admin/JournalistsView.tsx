@@ -51,6 +51,27 @@ const DEFAULT_AVATAR_URLS = {
   female: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop'
 };
 
+type ProviderTestState = {
+  status: 'idle' | 'testing' | 'online' | 'offline';
+  detail: string;
+  checkedAt?: string;
+};
+
+type ProviderConfig = {
+  id: string;
+  label: string;
+  provider: string;
+};
+
+const RESEARCH_PROVIDERS: ProviderConfig[] = [
+  { id: 'moonshot', label: 'Moonshot Kimi', provider: 'MOONSHOT' },
+  { id: 'zhipu', label: 'Zhipu AI', provider: 'ZAI' },
+  { id: 'gemini', label: 'Google Gemini', provider: 'GEMINI' },
+  { id: 'aiml', label: 'AI/ML API', provider: 'AIMLAPI' }
+];
+
+const RESEARCH_PROXY_URL = 'https://www.sh00tre.xyz/api/proxy-research';
+
 const JournalistsView: React.FC = () => {
   const navigate = useNavigate();
   const [bots, setBots] = useState<Bot[]>([]);
@@ -69,6 +90,10 @@ const JournalistsView: React.FC = () => {
   const [newsQuery, setNewsQuery] = useState('');
   const [isSearchingNews, setIsSearchingNews] = useState(false);
   const [newsResults, setNewsResults] = useState<{title: string, summary: string}[]>([]);
+  const [apiTestQuery, setApiTestQuery] = useState('Debate Over Socialist Economics in the United States');
+  const [providerTests, setProviderTests] = useState<Record<string, ProviderTestState>>(() =>
+    Object.fromEntries(RESEARCH_PROVIDERS.map((p) => [p.id, { status: 'idle', detail: 'Not tested yet.' }]))
+  );
   
   const [formData, setFormData] = useState({
     name: '',
@@ -142,6 +167,68 @@ const JournalistsView: React.FC = () => {
       setIsSearchingNews(false);
     }
   };
+
+  const testProvider = async (provider: ProviderConfig) => {
+    setProviderTests((prev) => ({
+      ...prev,
+      [provider.id]: { status: 'testing', detail: 'Testing connection...' }
+    }));
+
+    try {
+      const res = await fetch(RESEARCH_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: provider.provider,
+          query: apiTestQuery,
+          test: true,
+          mode: 'healthcheck'
+        })
+      });
+
+      const bodyText = await res.text();
+      const checkedAt = new Date().toLocaleTimeString();
+
+      if (!res.ok) {
+        setProviderTests((prev) => ({
+          ...prev,
+          [provider.id]: {
+            status: 'offline',
+            detail: `HTTP ${res.status}: ${bodyText.slice(0, 180) || 'No response body'}`,
+            checkedAt
+          }
+        }));
+        return;
+      }
+
+      setProviderTests((prev) => ({
+        ...prev,
+        [provider.id]: {
+          status: 'online',
+          detail: 'Provider responded successfully via proxy.',
+          checkedAt
+        }
+      }));
+    } catch (err: any) {
+      setProviderTests((prev) => ({
+        ...prev,
+        [provider.id]: {
+          status: 'offline',
+          detail: err?.message || 'Network request failed.',
+          checkedAt: new Date().toLocaleTimeString()
+        }
+      }));
+    }
+  };
+
+  const testAllProviders = async () => {
+    for (const provider of RESEARCH_PROVIDERS) {
+      // Sequential requests make API diagnostics easier to read and throttle-friendly.
+      // eslint-disable-next-line no-await-in-loop
+      await testProvider(provider);
+    }
+  };
+
 
   const calculateNextRun = (bot: Bot) => {
     if (!bot.last_run) return new Date(0);
@@ -344,6 +431,66 @@ const JournalistsView: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="p-4 bg-gray-50 rounded border border-gray-200 space-y-3">
+                    <div className="flex flex-wrap justify-between items-center gap-3">
+                      <label className="text-[10px] font-black uppercase text-gray-600 tracking-widest">API Health Checks</label>
+                      <button
+                        onClick={testAllProviders}
+                        className="bg-gray-900 text-white px-3 py-2 text-[9px] font-black uppercase rounded"
+                      >
+                        Test All APIs
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={apiTestQuery}
+                      onChange={(e) => setApiTestQuery(e.target.value)}
+                      className="w-full text-xs p-2 border focus:border-blue-500 outline-none"
+                      placeholder="Test query for provider checks"
+                    />
+
+                    <div className="space-y-2">
+                      {RESEARCH_PROVIDERS.map((provider) => {
+                        const state = providerTests[provider.id];
+                        const isTesting = state?.status === 'testing';
+                        return (
+                          <div key={provider.id} className="p-2 bg-white border rounded">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] font-black text-gray-800">{provider.label}</p>
+                                <p className="text-[9px] text-gray-500">
+                                  {state?.detail || 'Not tested yet.'}
+                                  {state?.checkedAt ? ` • ${state.checkedAt}` : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-[8px] px-2 py-1 rounded font-black uppercase ${
+                                  state?.status === 'online'
+                                    ? 'bg-green-100 text-green-700'
+                                    : state?.status === 'offline'
+                                    ? 'bg-red-100 text-red-700'
+                                    : state?.status === 'testing'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {state?.status || 'idle'}
+                                </span>
+                                <button
+                                  onClick={() => testProvider(provider)}
+                                  disabled={isTesting}
+                                  className="bg-blue-600 text-white px-3 py-1.5 text-[9px] font-black uppercase rounded disabled:opacity-50"
+                                >
+                                  {isTesting ? 'Testing...' : 'Test API'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-gray-400">Professional Title</label>
                     <input type="text" className="w-full border-2 p-3 font-bold text-sm bg-gray-50 outline-none focus:border-blue-500" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
@@ -371,6 +518,66 @@ const JournalistsView: React.FC = () => {
                                 <p className="text-[8px] text-gray-500 line-clamp-1">{n.summary}</p>
                             </div>
                         ))}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded border border-gray-200 space-y-3">
+                    <div className="flex flex-wrap justify-between items-center gap-3">
+                      <label className="text-[10px] font-black uppercase text-gray-600 tracking-widest">API Health Checks</label>
+                      <button
+                        onClick={testAllProviders}
+                        className="bg-gray-900 text-white px-3 py-2 text-[9px] font-black uppercase rounded"
+                      >
+                        Test All APIs
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={apiTestQuery}
+                      onChange={(e) => setApiTestQuery(e.target.value)}
+                      className="w-full text-xs p-2 border focus:border-blue-500 outline-none"
+                      placeholder="Test query for provider checks"
+                    />
+
+                    <div className="space-y-2">
+                      {RESEARCH_PROVIDERS.map((provider) => {
+                        const state = providerTests[provider.id];
+                        const isTesting = state?.status === 'testing';
+                        return (
+                          <div key={provider.id} className="p-2 bg-white border rounded">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] font-black text-gray-800">{provider.label}</p>
+                                <p className="text-[9px] text-gray-500">
+                                  {state?.detail || 'Not tested yet.'}
+                                  {state?.checkedAt ? ` • ${state.checkedAt}` : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-[8px] px-2 py-1 rounded font-black uppercase ${
+                                  state?.status === 'online'
+                                    ? 'bg-green-100 text-green-700'
+                                    : state?.status === 'offline'
+                                    ? 'bg-red-100 text-red-700'
+                                    : state?.status === 'testing'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {state?.status || 'idle'}
+                                </span>
+                                <button
+                                  onClick={() => testProvider(provider)}
+                                  disabled={isTesting}
+                                  className="bg-blue-600 text-white px-3 py-1.5 text-[9px] font-black uppercase rounded disabled:opacity-50"
+                                >
+                                  {isTesting ? 'Testing...' : 'Test API'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
