@@ -46,6 +46,7 @@ const AdminSidebar: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     { label: 'Messages', path: '/admin/messages', icon: '📬', roles: ['admin'] },
     { label: 'Media', path: '/admin/media', icon: '📷', roles: ['admin', 'editor'] },
     { label: 'Pages', path: '/admin/pages', icon: '📄', roles: ['admin', 'editor'] },
+    { label: 'SEO', path: '/admin/seo', icon: '🔎', roles: ['admin', 'editor'] },
     { label: 'Comments', path: '/admin/comments', icon: '💬', roles: ['admin', 'editor', 'reviewer', 'user'] },
     { type: 'separator' },
     { label: 'Appearance', path: '/admin/appearance', icon: '🖌️', roles: ['admin', 'editor', 'reviewer', 'user'] },
