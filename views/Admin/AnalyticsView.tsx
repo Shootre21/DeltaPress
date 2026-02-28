@@ -4,7 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import AdminSidebar from '../../components/AdminSidebar';
 
-type AnalyticsTab = 'bots' | 'users' | 'site' | 'posts';
+type AnalyticsTab = 'bots' | 'users' | 'site' | 'posts' | 'seo';
+
+type AnalyticsEngine = 'google' | 'yahoo' | 'bing';
+
+interface SeoRecommendation {
+  id: string;
+  source: AnalyticsEngine;
+  title: string;
+  detail: string;
+}
 
 interface SessionData {
   sessionId: string;
@@ -46,6 +55,11 @@ const parseUA = (ua: string) => {
 const AnalyticsView: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('users');
+  const [enabledEngines, setEnabledEngines] = useState<Record<AnalyticsEngine, boolean>>({
+    google: true,
+    yahoo: true,
+    bing: true
+  });
   const [loading, setLoading] = useState(true);
   
   const [stats, setStats] = useState({
@@ -186,6 +200,51 @@ const AnalyticsView: React.FC = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  const seoRecommendations: SeoRecommendation[] = [
+    {
+      id: 'google-1',
+      source: 'google',
+      title: 'Strengthen metadata and schema markup',
+      detail: `Google Analytics trendline shows ${stats.sitePerformance.totalViews} tracked views. Add article schema and tighter meta descriptions to improve search snippets for high-traffic posts.`
+    },
+    {
+      id: 'google-2',
+      source: 'google',
+      title: 'Improve internal linking on top content',
+      detail: 'Use internal links from your top-performing posts to related evergreen pages so crawlers discover more pages per session.'
+    },
+    {
+      id: 'yahoo-1',
+      source: 'yahoo',
+      title: 'Expand keyword variants in headlines',
+      detail: 'Yahoo audience indexing tends to reward exact phrase matching. Test headline variants with natural long-tail keyword phrases.'
+    },
+    {
+      id: 'yahoo-2',
+      source: 'yahoo',
+      title: 'Refresh older posts with updated publish notes',
+      detail: 'Add updated context and fresh paragraph summaries to older content so Yahoo syndication feeds can surface recently maintained pages.'
+    },
+    {
+      id: 'bing-1',
+      source: 'bing',
+      title: 'Optimize media alt text for Bing image discovery',
+      detail: 'Bing analytics signals often correlate with image search. Ensure featured images and inline assets have descriptive alt text and captions.'
+    },
+    {
+      id: 'bing-2',
+      source: 'bing',
+      title: 'Audit Core Web Vitals and crawl depth',
+      detail: `Average tracked session time is ${stats.sitePerformance.avgSessionTime} minute(s). Improve first paint and reduce navigation depth to improve Bing crawl quality.`
+    }
+  ];
+
+  const activeRecommendations = seoRecommendations.filter((rec) => enabledEngines[rec.source]);
+
+  const toggleEngine = (engine: AnalyticsEngine) => {
+    setEnabledEngines((prev) => ({ ...prev, [engine]: !prev[engine] }));
+  };
+
   const TabButton = ({ id, label }: { id: AnalyticsTab, label: string }) => (
     <button
       onClick={() => setActiveTab(id)}
@@ -219,6 +278,7 @@ const AnalyticsView: React.FC = () => {
           <TabButton id="site" label="Site Performance" />
           <TabButton id="posts" label="Post Engagement" />
           <TabButton id="bots" label="Bot Registry" />
+          <TabButton id="seo" label="SEO Optimization" />
         </nav>
 
         {loading ? (
@@ -321,6 +381,47 @@ const AnalyticsView: React.FC = () => {
                  </div>
               </div>
             )}
+
+            {activeTab === 'seo' && (
+              <section className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 space-y-8">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">SEO Recommendation Engines</h3>
+                    <p className="text-sm text-gray-600">Enable analytics sources to generate optimization recommendations for your editorial team.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {([
+                      { key: 'google', label: 'Google Analytics' },
+                      { key: 'yahoo', label: 'Yahoo Analytics' },
+                      { key: 'bing', label: 'Bing Analytics' }
+                    ] as { key: AnalyticsEngine; label: string }[]).map((engine) => (
+                      <button
+                        key={engine.key}
+                        onClick={() => toggleEngine(engine.key)}
+                        className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wider border transition-all ${enabledEngines[engine.key] ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-500'}`}
+                      >
+                        {enabledEngines[engine.key] ? '✓ ' : ''}{engine.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {activeRecommendations.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">Enable at least one analytics source to receive SEO recommendations.</p>
+                  ) : (
+                    activeRecommendations.map((rec) => (
+                      <article key={rec.id} className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-2">{rec.source} analytics</p>
+                        <h4 className="text-sm font-black text-gray-900 mb-2">{rec.title}</h4>
+                        <p className="text-sm text-gray-600 leading-relaxed">{rec.detail}</p>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+
 
             {activeTab === 'bots' && (
               <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
