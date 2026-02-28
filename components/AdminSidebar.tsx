@@ -3,6 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
+type MenuItem = {
+  label?: string;
+  path?: string;
+  icon?: string;
+  roles?: string[];
+  type?: 'separator';
+  activeOn?: (pathname: string, search: string) => boolean;
+};
+
 const AdminSidebar: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,9 +40,10 @@ const AdminSidebar: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     fetchUserAndRole();
   }, []);
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     { label: 'Dashboard', path: '/admin', icon: '📊', roles: ['admin', 'editor', 'reviewer', 'user'] },
-    { label: 'Analytics', path: '/admin/analytics', icon: '📈', roles: ['admin', 'editor'] },
+    { label: 'Analytics', path: '/admin/analytics', icon: '📈', roles: ['admin', 'editor'], activeOn: (pathname, search) => pathname === '/admin/analytics' && !new URLSearchParams(search).get('tab') },
+    { label: 'SEO Optimization', path: '/admin/analytics?tab=seo', icon: '🔍', roles: ['admin', 'editor'], activeOn: (pathname, search) => pathname === '/admin/analytics' && new URLSearchParams(search).get('tab') === 'seo' },
     { type: 'separator' },
     { label: 'All Posts', path: '/admin/posts', icon: '✍️', roles: ['admin', 'editor', 'reviewer'] },
     { label: 'Add New', path: '/admin/new-post', icon: '➕', roles: ['admin', 'editor'] },
@@ -53,7 +63,10 @@ const AdminSidebar: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     { label: 'Settings', path: '/admin/settings', icon: '⚙️', roles: ['admin'] },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (item: MenuItem) => {
+    if (item.activeOn) return item.activeOn(location.pathname, location.search);
+    return location.pathname === item.path;
+  };
 
   const filteredItems = menuItems.filter(item => {
     if (item.type === 'separator') return true;
@@ -100,7 +113,7 @@ const AdminSidebar: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
               return <div key={idx} className="h-4 border-b border-[#3c434a] my-2 mx-4 opacity-10" />;
             }
 
-            const className = `flex items-center gap-3 px-4 py-2.5 hover:bg-[#191e23] hover:text-[#72aee6] transition-colors text-[14px] ${isActive(item.path!) ? 'bg-[#0073aa] text-white font-bold' : 'text-[#a7aaad]'}`;
+            const className = `flex items-center gap-3 px-4 py-2.5 hover:bg-[#191e23] hover:text-[#72aee6] transition-colors text-[14px] ${isActive(item) ? 'bg-[#0073aa] text-white font-bold' : 'text-[#a7aaad]'}`;
 
             return (
               <Link key={idx} to={item.path!} className={className}>
