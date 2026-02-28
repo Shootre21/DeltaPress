@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import AdminSidebar from '../../components/AdminSidebar';
 
@@ -54,7 +54,9 @@ const parseUA = (ua: string) => {
 
 const AnalyticsView: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('users');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as AnalyticsTab) || 'users';
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>(initialTab);
   const [enabledEngines, setEnabledEngines] = useState<Record<AnalyticsEngine, boolean>>({
     google: true,
     yahoo: true,
@@ -244,6 +246,19 @@ const AnalyticsView: React.FC = () => {
   const toggleEngine = (engine: AnalyticsEngine) => {
     setEnabledEngines((prev) => ({ ...prev, [engine]: !prev[engine] }));
   };
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as AnalyticsTab | null;
+    if (tabParam && ['users', 'site', 'posts', 'bots', 'seo'].includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
+
+  useEffect(() => {
+    if (searchParams.get('tab') !== activeTab) {
+      setSearchParams({ tab: activeTab });
+    }
+  }, [activeTab, searchParams, setSearchParams]);
 
   const TabButton = ({ id, label }: { id: AnalyticsTab, label: string }) => (
     <button
